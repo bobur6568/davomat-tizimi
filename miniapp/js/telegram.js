@@ -64,13 +64,10 @@ function handleTelegramBack() {
 // TELEGRAM USER => AUTO LOGIN
 // ============================================================
 function tryTelegramAutoLogin() {
-  if (!isTelegramApp) return false;
+  if (!tgUserId) return false;
   if (currentUser) return true;
 
-  const tgUser = TG.initDataUnsafe?.user;
-  if (!tgUser) return false;
-
-  const tgId = String(tgUser.id);
+  const tgId = tgUserId;
 
   // Avval DB.users dan qidirish
   if(DB && DB.users && DB.users.length > 0) {
