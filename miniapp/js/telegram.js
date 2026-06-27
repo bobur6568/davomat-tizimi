@@ -3,10 +3,20 @@
 // ============================================================
 
 const TG = window.Telegram?.WebApp;
-
-// Telegram WebApp mavjudligini tekshirish
 const isTelegramApp = !!(TG && TG.initData && TG.initData.length > 0);
-const tgUserId = TG?.initDataUnsafe?.user?.id ? String(TG.initDataUnsafe.user.id) : null;
+
+// initData dan user ID ni parse qilish
+function parseTgUserId() {
+  try {
+    if(!TG || !TG.initData) return null;
+    const params = new URLSearchParams(TG.initData);
+    const userStr = params.get('user');
+    if(!userStr) return null;
+    const user = JSON.parse(decodeURIComponent(userStr));
+    return user?.id ? String(user.id) : null;
+  } catch(e) { return null; }
+}
+const tgUserId = parseTgUserId() || (TG?.initDataUnsafe?.user?.id ? String(TG.initDataUnsafe.user.id) : null);
 
 // ============================================================
 // TELEGRAM INIT
