@@ -87,6 +87,12 @@ function isEditAllowed(savedAt) { if(!savedAt) return false; return (Date.now()-
 // ============================================================
 // AUTH
 // ============================================================
+function tryAutoLoginFromScreen() {
+  if(typeof tryTelegramAutoLogin==='function') {
+    const ok = tryTelegramAutoLogin();
+    if(ok) return;
+  }
+}
 function doLogin() {
   const login=document.getElementById('login-inp').value.trim();
   const pass=document.getElementById('pass-inp').value;
@@ -99,6 +105,7 @@ function doLogout() {
   currentUser=null; Storage.clearSession();
   document.getElementById('app').style.display='none';
   document.getElementById('login-screen').style.display='flex';
+  setTimeout(tryAutoLoginFromScreen, 2000);
   document.getElementById('login-inp').value='';
   document.getElementById('pass-inp').value='';
 }
