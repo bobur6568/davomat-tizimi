@@ -18,6 +18,13 @@ window.addEventListener('DOMContentLoaded', () => {
   Storage.load();
   const saved = Storage.loadSession();
   if (saved) { currentUser = saved; bootApp(); }
+  else {
+    setTimeout(() => {
+      if (!currentUser && typeof tryTelegramAutoLogin === 'function') {
+        tryTelegramAutoLogin();
+      }
+    }, 1200);
+  }
   startClock();
   document.getElementById('login-inp').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('pass-inp').focus(); });
   document.getElementById('pass-inp').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
