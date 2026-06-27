@@ -64,27 +64,44 @@ function handleTelegramBack() {
 // ============================================================
 function tryTelegramAutoLogin() {
   if (!isTelegramApp) return false;
+  if (currentUser) return true;
 
   const tgUser = TG.initDataUnsafe?.user;
   if (!tgUser) return false;
 
-  // Telegram user ID bo'yicha DB.users da qidirish
   const tgId = String(tgUser.id);
-  const user = DB.users.find(u => u.telegram_id === tgId);
 
-  if (user) {
-    currentUser = user;
-    Storage.saveSession(user);
-    bootApp();
-
-    // Xush kelibsiz xabari
-    if (isTelegramApp) {
-      TG.showPopup({
-        title: '✅ Xush kelibsiz!',
-        message: user.name + '\n' + getRoleLabel(user.role),
-        buttons: [{ type: 'ok' }]
-      });
+  // Avval DB.users dan qidirish
+  if(DB && DB.users && DB.users.length > 0) {
+    const user = DB.users.find(u => u.telegram_id === tgId);
+    if (user) {
+      currentUser = user;
+      Storage.saveSession(user);
+      document.getElementById('login-screen').style.display='none';
+      bootApp();
+      tgHapticNotif('success');
+      return true;
     }
+  }
+
+  // Firebase dan to'g'ridan yuklash
+  if(typeof FirebaseStorage !== 'undefined') {
+    FirebaseStorage.load().then(data => {
+      if(!data || !data.users) return;
+      const user = data.users.find(u => u.telegram_id === tgId);
+      if(user) {
+        Storage._applyData(data);
+        currentUser = user;
+        Storage.saveSession(user);
+        document.getElementById('login-screen').style.display='none';
+        bootApp();
+        tgHapticNotif('success');
+      }
+    });
+  }
+
+  return false;
+}
     return true;
   }
 
