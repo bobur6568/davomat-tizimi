@@ -435,6 +435,11 @@ const Storage = {
   // Aktiv sahifani qayta render qilish
   _refreshActivePage() {
     try {
+      // Firebase yuklanganida Telegram auto-login qayta urinish
+      if(typeof retryTelegramAutoLogin === 'function' && !currentUser) {
+        retryTelegramAutoLogin();
+        return;
+      }
       const activePage = document.querySelector('.page.active');
       if(!activePage) return;
       const pageId = activePage.id.replace('page-','');
