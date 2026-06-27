@@ -6,6 +6,7 @@ const TG = window.Telegram?.WebApp;
 
 // Telegram WebApp mavjudligini tekshirish
 const isTelegramApp = !!(TG && TG.initData && TG.initData.length > 0);
+const tgUserId = TG?.initDataUnsafe?.user?.id ? String(TG.initDataUnsafe.user.id) : null;
 
 // ============================================================
 // TELEGRAM INIT
