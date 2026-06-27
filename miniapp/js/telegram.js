@@ -23,6 +23,7 @@ const tgUserId = parseTgUserId() || (TG?.initDataUnsafe?.user?.id ? String(TG.in
 // ============================================================
 function initTelegramApp() {
   if (!isTelegramApp) return;
+  alert('TG ID: ' + tgUserId + ' | initData: ' + (TG.initData ? TG.initData.substring(0,50) : 'YOQ'));
 
   // Ilovani to'liq kengaytirish
   TG.expand();
