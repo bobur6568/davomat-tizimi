@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Davomat Tizimi</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root{
+  --bg:#0f1117;--bg2:#161b27;--bg3:#1e2535;--bg4:#252d40;
+  --border:#2e3a52;--border2:#3a4a66;
+  --text:#e8edf5;--text2:#8a97b0;--text3:#556278;
+  --green:#00c98d;--green2:#00a876;--green-dim:rgba(0,201,141,.1);
+  --amber:#f5a623;--amber-dim:rgba(245,166,35,.1);
+  --red:#f04f4f;--red-dim:rgba(240,79,79,.1);
+  --blue:#4a9eff;--blue-dim:rgba(74,158,255,.1);
+  --purple:#a78bfa;--purple-dim:rgba(167,139,250,.1);
+  --cyan:#22d3ee;--cyan-dim:rgba(34,211,238,.1);
+  --radius:10px;--radius-sm:6px;--radius-lg:14px;
+  --font:'IBM Plex Sans',sans-serif;--mono:'IBM Plex Mono',monospace;
+  --shadow:0 8px 32px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);font-size:13px;line-height:1.5;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg2);}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+
+/* APP LAYOUT */
+#app{display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+.topbar{display:flex;align-items:center;gap:10px;padding:8px 18px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;}
+.logo-wrap{display:flex;align-items:center;gap:10px;}
+.logo-img-box{width:34px;height:34px;border-radius:8px;overflow:hidden;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;position:relative;}
+.logo-img-box img{width:100%;height:100%;object-fit:cover;}
+.logo-img-box .upload-hint{position:absolute;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;font-size:10px;color:#fff;text-align:center;}
+.logo-img-box:hover .upload-hint{display:flex;}
+#logo-upload{display:none;}
+.logo-text h1{font-size:14px;font-weight:600;}
+.logo-text p{font-size:10px;color:var(--text2);font-family:var(--mono);}
+.topbar .spacer{flex:1;}
+.user-badge{background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:11px;display:flex;align-items:center;gap:6px;}
+.user-badge .role{color:var(--green);font-family:var(--mono);}
+.clock{font-family:var(--mono);font-size:12px;color:var(--text2);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 10px;}
+.clock span{color:var(--text);}
+
+.main-body{display:flex;flex:1;overflow:hidden;}
+.sidebar{width:196px;background:var(--bg2);border-right:1px solid var(--border);padding:10px 8px;display:flex;flex-direction:column;gap:2px;flex-shrink:0;overflow-y:auto;}
+.nav-group-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;font-family:var(--mono);padding:0 8px;margin:6px 0 3px;}
+.nav-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;color:var(--text2);transition:all .15s;border:1px solid transparent;font-size:12px;}
+.nav-item:hover{background:var(--bg3);color:var(--text);}
+.nav-item.active{background:var(--green-dim);color:var(--green);border-color:rgba(0,201,141,.2);}
+.nav-item .ni-icon{font-size:14px;width:18px;text-align:center;}
+.sidebar .logout-btn{margin-top:auto;padding-top:10px;border-top:1px solid var(--border);}
+
+.content{flex:1;overflow-y:auto;padding:20px;}
+.page{display:none;animation:fadeIn .15s ease;}
+.page.active{display:block;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem;}
+.card-title{font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:.75rem;font-family:var(--mono);}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;}
+.card-header .card-title{margin:0;}
+
+/* STATS */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;margin-bottom:1rem;}
+.stat{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;}
+.stat .sv{font-size:22px;font-weight:600;font-family:var(--mono);}
+.stat .sl{font-size:11px;color:var(--text2);margin-top:1px;}
+.green .sv{color:var(--green);}.amber .sv{color:var(--amber);}.red .sv{color:var(--red);}.blue .sv{color:var(--blue);}.purple .sv{color:var(--purple);}.cyan .sv{color:var(--cyan);}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{text-align:left;padding:8px 10px;font-size:10px;color:var(--text3);border-bottom:1px solid var(--border);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;}
+td{padding:9px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(255,255,255,.02);}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:500;white-space:nowrap;}
+.b-keldi{background:var(--green-dim);color:var(--green);}
+.b-kech{background:var(--amber-dim);color:var(--amber);}
+.b-yoq{background:var(--red-dim);color:var(--red);}
+.b-erta{background:var(--amber-dim);color:var(--amber);}
+.b-yordam{background:var(--purple-dim);color:var(--purple);}
+.b-bosh{background:var(--blue-dim);color:var(--blue);}
+.b-admin{background:var(--cyan-dim);color:var(--cyan);}
+.b-admin2{background:var(--blue-dim);color:var(--blue);}
+.b-mas{background:var(--green-dim);color:var(--green);}
+.b-kiritilgan{background:var(--green-dim);color:var(--green);}
+.b-kutilmoqda{background:var(--bg4);color:var(--text3);border:1px solid var(--border);}
+
+/* BUTTONS */
+.btn{padding:7px 14px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--text);transition:all .15s;font-family:var(--font);}
+.btn:hover{background:var(--bg4);border-color:var(--border2);}
+.btn.primary{background:var(--green);color:#000;border-color:var(--green2);font-weight:600;}
+.btn.primary:hover{background:var(--green2);}
+.btn.danger{color:var(--red);border-color:transparent;background:transparent;}
+.btn.danger:hover{background:var(--red-dim);border-color:var(--red);}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--text2);}
+.btn.ghost:hover{color:var(--text);background:var(--bg3);}
+.btn.sm{padding:5px 12px;font-size:11px;}
+.btn.xs{padding:2px 8px;font-size:10px;}
+.btn-row{display:flex;gap:8px;justify-content:flex-end;margin-top:1rem;flex-wrap:wrap;}
+
+/* FORMS */
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+.form-group{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;}
+.form-group label{font-size:11px;color:var(--text2);font-family:var(--mono);}
+input,select,textarea{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font);font-size:12px;padding:8px 10px;width:100%;transition:border .15s;}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green);}
+input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.5);}
+
+/* PAGE HEADER */
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:8px;}
+.page-header h2{font-size:17px;font-weight:600;}
+.page-header p{font-size:11px;color:var(--text2);margin-top:2px;}
+
+/* PROGRESS */
+.progress-bar{background:var(--bg4);border-radius:3px;height:5px;overflow:hidden;}
+.progress-fill{height:100%;border-radius:3px;background:var(--green);transition:width .4s;}
+
+/* ALERTS */
+.alert{border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:1rem;font-size:12px;display:flex;align-items:flex-start;gap:8px;}
+.alert.warn{background:var(--amber-dim);border:1px solid rgba(245,166,35,.3);color:var(--amber);}
+.alert.err{background:var(--red-dim);border:1px solid rgba(240,79,79,.3);color:var(--red);}
+.alert.ok{background:var(--green-dim);border:1px solid rgba(0,201,141,.3);color:var(--green);}
+.alert.info{background:var(--blue-dim);border:1px solid rgba(74,158,255,.3);color:var(--blue);}
+
+/* GRID SELECT */
+.grid-select{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;}
+.grid-btn{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:14px 12px;cursor:pointer;transition:all .15s;color:var(--text);}
+.grid-btn:hover{border-color:var(--border2);background:var(--bg4);}
+.grid-btn.selected{border-color:var(--green);background:var(--green-dim);}
+.grid-btn.done{border-color:rgba(0,201,141,.3);}
+.grid-btn .gb-label{font-weight:700;font-size:16px;font-family:var(--mono);}
+.grid-btn.selected .gb-label{color:var(--green);}
+.grid-btn .gb-sub{font-size:11px;color:var(--text2);margin-top:3px;}
+
+/* TABS */
+.tabs{display:flex;gap:3px;background:var(--bg3);border-radius:var(--radius-sm);padding:3px;margin-bottom:1rem;flex-wrap:wrap;}
+.tab-btn{flex:1;min-width:70px;padding:7px 8px;border:none;background:transparent;border-radius:5px;font-size:12px;color:var(--text2);cursor:pointer;font-family:var(--font);transition:all .15s;white-space:nowrap;}
+.tab-btn.active{background:var(--bg4);color:var(--text);border:1px solid var(--border);}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(3px);}
+.modal-overlay.hidden{display:none;}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:1.5rem;width:480px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow);}
+.modal h3{font-size:15px;font-weight:600;margin-bottom:.25rem;}
+.modal .m-sub{font-size:11px;color:var(--text2);margin-bottom:1.25rem;font-family:var(--mono);}
+
+/* TOAST */
+#toast{position:fixed;bottom:24px;right:24px;z-index:500;pointer-events:none;}
+.toast-item{background:var(--bg2);border-radius:var(--radius-sm);padding:10px 16px;font-size:12px;margin-top:8px;box-shadow:var(--shadow);animation:slideUp .2s ease;display:flex;align-items:center;gap:8px;border:1px solid var(--border);}
+.toast-item.ok{border-left:3px solid var(--green);color:var(--green);}
+.toast-item.err{border-left:3px solid var(--red);color:var(--red);}
+.toast-item.warn{border-left:3px solid var(--amber);color:var(--amber);}
+@keyframes slideUp{from{transform:translateY(16px);opacity:0;}to{transform:none;opacity:1;}}
+
+/* SEARCH */
+.search-wrap{position:relative;margin-bottom:1rem;}
+.search-wrap input{padding-left:30px;}
+.search-wrap::before{content:'🔍';position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:11px;pointer-events:none;}
+
+/* CHART */
+.chart-container{position:relative;height:220px;}
+
+/* LOGIN */
+#login-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999;}
+.login-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:2.5rem;width:370px;max-width:95vw;box-shadow:var(--shadow);}
+.login-box .lb-logo{text-align:center;margin-bottom:2rem;}
+.lb-logo-img{width:64px;height:64px;border-radius:14px;overflow:hidden;margin:0 auto .75rem;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:32px;}
+.lb-logo-img img{width:100%;height:100%;object-fit:cover;}
+.login-box .lb-logo h1{font-size:19px;font-weight:600;}
+.login-box .lb-logo p{font-size:11px;color:var(--text2);margin-top:4px;}
+.login-err{color:var(--red);font-size:12px;text-align:center;margin-bottom:.75rem;min-height:18px;}
+.login-hint{margin-top:1rem;font-size:11px;color:var(--text3);text-align:center;line-height:1.8;}
+
+/* EMP ROW */
+.emp-row{display:grid;grid-template-columns:26px 1fr auto;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--border);}
+.emp-row:last-child{border-bottom:none;}
+.emp-row.yoq-row{background:var(--red-dim);border-radius:6px;padding:8px 8px;margin:2px 0;}
+.emp-row.kech-row{background:var(--amber-dim);border-radius:6px;padding:8px 8px;margin:2px 0;}
+.emp-row.erta-row{background:rgba(245,166,35,.08);border-radius:6px;padding:8px 8px;margin:2px 0;border-left:2px solid var(--amber);}
+.emp-check{width:17px;height:17px;cursor:pointer;accent-color:var(--red);}
+.emp-name{font-size:12px;font-weight:500;}
+.emp-tabel{font-family:var(--mono);font-size:10px;color:var(--text3);}
+.emp-actions{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.kech-input{width:80px;text-align:center;padding:4px 6px;}
+.reason-sel{max-width:190px;padding:4px 6px;font-size:11px;}
+
+/* YORDAM / BOSH */
+.yordam-section{background:var(--purple-dim);border:1px solid rgba(167,139,250,.2);border-radius:var(--radius);padding:1rem 1.25rem;margin-top:1rem;}
+.bosh-section{background:var(--blue-dim);border:1px solid rgba(74,158,255,.2);border-radius:var(--radius);padding:1rem 1.25rem;margin-top:1rem;}
+.section-mini-title{font-size:11px;font-weight:600;font-family:var(--mono);margin-bottom:.75rem;text-transform:uppercase;letter-spacing:.5px;}
+.sm-title-purple{color:var(--purple);}
+.sm-title-blue{color:var(--blue);}
+.yordam-chip{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg3);border-radius:6px;margin-bottom:6px;}
+
+/* RESULT BOX */
+.result-box{background:var(--bg2);border:1px solid var(--green);border-radius:var(--radius-lg);padding:1.5rem;margin-bottom:1rem;}
+.result-box h3{font-size:15px;font-weight:600;color:var(--green);margin-bottom:.5rem;}
+
+/* MOBILE RESPONSIVE */
+@media(max-width:768px){
+  .sidebar{position:fixed;left:-220px;top:0;height:100vh;z-index:100;transition:left .25s ease;box-shadow:var(--shadow);}
+  .sidebar.open{left:0;}
+  .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99;}
+  .sidebar-overlay.show{display:block;}
+  .content{padding:12px;}
+  .form-row{grid-template-columns:1fr;}
+  .stats-row{grid-template-columns:repeat(2,1fr);}
+  .topbar{padding:8px 12px;}
+  .user-badge{display:none;}
+  .topbar .logo-text p{display:none;}
+  .menu-btn{display:flex!important;}
+  .emp-row{grid-template-columns:26px 1fr;}
+  .emp-actions{grid-column:1/-1;padding-left:34px;}
+  .modal{width:98vw;padding:1rem;}
+  .grid-select{grid-template-columns:repeat(2,1fr);}
+  .page-header{flex-direction:column;align-items:flex-start;}
+}
+@media(min-width:769px){.menu-btn{display:none!important;}.sidebar-overlay{display:none!important;}}
+@media(max-width:700px){.form-row{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <!-- Til tanlash -->
+    <div style="display:flex;justify-content:center;gap:8px;margin-bottom:1.25rem">
+      <button onclick="changeLang('uz')" id="lang-uz" class="btn sm" style="font-weight:600;border-color:var(--green);color:var(--green)">O'Z</button>
+      <button onclick="changeLang('ru')" id="lang-ru" class="btn sm">RU</button>
+    </div>
+    <div class="lb-logo">
+      <div class="lb-logo-img" id="login-logo-box">📋</div>
+      <h1 id="login-title">Davomat Tizimi</h1>
+      <p id="login-subtitle">Ishlab chiqarish davomati boshqaruvi</p>
+    </div>
+    <div class="form-group"><label id="lbl-login">Login</label><input type="text" id="login-inp" placeholder="login" autocomplete="username"></div>
+    <div class="form-group"><label id="lbl-pass">Parol</label><input type="password" id="pass-inp" placeholder="••••••" autocomplete="current-password"></div>
+    <div class="login-err" id="login-err"></div>
+    <button class="btn primary" id="login-btn" style="width:100%;margin-top:.25rem;padding:10px" onclick="doLogin()">Kirish →</button>
+    <div class="login-hint">
+      Admin: <span style="font-family:var(--mono)">admin / admin123</span><br>
+      <span id="hint-masul">Mas'ul</span>: <span style="font-family:var(--mono)">ua_a / 1234</span>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+  <div class="topbar">
+    <button class="menu-btn btn ghost" onclick="toggleSidebar()" style="display:none;padding:6px 10px;margin-right:4px">☰</button>
+    <div class="logo-wrap">
+      <div class="logo-img-box" id="topbar-logo-box" onclick="document.getElementById('logo-upload').click()" title="Rasm yuklash uchun bosing">
+        <span id="topbar-logo-icon">📋</span>
+        <span class="upload-hint">📷<br>Rasm</span>
+      </div>
+      <input type="file" id="logo-upload" accept="image/*" onchange="uploadLogo(this)">
+      <div class="logo-text">
+        <h1>Davomat Tizimi</h1>
+        <p id="topbar-date">—</p>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <div class="clock"><span id="clock">--:--</span></div>
+    <div id="test-mode-badge" style="display:none;font-size:10px;background:var(--amber-dim);border:1px solid var(--amber);color:var(--amber);padding:3px 8px;border-radius:10px;font-family:var(--mono)">TEST REJIM</div>
+    <div class="user-badge">
+      <span id="user-name-badge">—</span>
+      <span class="role" id="user-role-badge">—</span>
+    </div>
+    <button class="btn sm" onclick="refreshData()" title="Ma'lumotlarni yangilash" style="padding:5px 10px">🔄</button>
+    <button class="btn sm danger" onclick="doLogout()">Chiqish</button>
+  </div>
+
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+  <div class="main-body">
+    <div class="sidebar" id="sidebar"></div>
+    <div class="content">
+
+      <!-- DAVOMAT -->
+      <div class="page" id="page-davomat"></div>
+
+      <!-- JAMLANMA -->
+      <div class="page" id="page-jamlanma">
+        <div class="page-header">
+          <div><h2>Bugungi Jamlanma</h2><p id="jam-date-label"></p></div>
+          <button class="btn sm" onclick="showPage('davomat')">+ Davomat kiritish</button>
+        </div>
+        <div class="stats-row" id="jam-stats"></div>
+        <div class="card"><div class="card-title">Bo'limlar holati</div><div id="jam-bolim-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px"></div></div>
+        <div class="card">
+          <div class="card-title">Batafsil ro'yhat</div>
+          <div class="search-wrap"><input type="text" placeholder="Ism yoki tabel..." oninput="filterJamTable(this.value)"></div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>#</th><th>Tabel</th><th>Ism Familiya</th><th>Bo'lim</th><th>Smena</th><th>Holat</th><th>Izoh</th></tr></thead>
+            <tbody id="jam-tbody"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <!-- HISOBOT -->
+      <div class="page" id="page-hisobot">
+        <div class="page-header"><div><h2>Hisobotlar</h2><p>Kunlik, haftalik, oylik, choraklik va yillik tahlil</p></div></div>
+        <div class="tabs">
+          <button class="tab-btn active" onclick="switchHisobot('kunlik',this)">Kunlik</button>
+          <button class="tab-btn" onclick="switchHisobot('haftalik',this)">Haftalik</button>
+          <button class="tab-btn" onclick="switchHisobot('oylik',this)">Oylik</button>
+          <button class="tab-btn" onclick="switchHisobot('chorak',this)">Choraklik</button>
+          <button class="tab-btn" onclick="switchHisobot('yillik',this)">Yillik</button>
+        </div>
+        <div id="hisobot-content"></div>
+      </div>
+
+      <!-- ISH GRAFIGI -->
+      <div class="page" id="page-grafik">
+        <div class="page-header">
+          <div><h2>Ish Grafigi</h2><p>Oylik smena jadvali boshqaruvi</p></div>
+        </div>
+        <div id="grafik-content"></div>
+      </div>
+
+      <!-- XODIMLAR -->
+      <div class="page" id="page-xodimlar">
+        <div class="page-header">
+          <div><h2>Xodimlar Boshqaruvi</h2><p id="xod-count-label"></p></div>
+          <button class="btn primary" onclick="openXodimModal()">+ Xodim qo'shish</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
+          <select id="xod-filter-bolim" onchange="renderXodimlar()" style="max-width:160px"><option value="">Barcha bo'limlar</option></select>
+          <select id="xod-filter-smena" onchange="renderXodimlar()" style="max-width:120px"><option value="">Barcha smenalar</option><option>A</option><option>B</option><option>C</option><option>D</option></select>
+          <div class="search-wrap" style="flex:1;min-width:180px;margin:0"><input type="text" placeholder="Ism yoki tabel..." oninput="renderXodimlar(this.value)"></div>
+        </div>
+        <div class="card"><div class="tbl-wrap"><table>
+          <thead><tr><th>#</th><th>Tabel</th><th>Ism Familiya</th><th>Bo'lim</th><th>Smena</th><th>Amallar</th></tr></thead>
+          <tbody id="xod-tbody"></tbody>
+        </table></div></div>
+      </div>
+
+      <!-- BO'LIMLAR -->
+      <div class="page" id="page-bolimlar">
+        <div class="page-header">
+          <div><h2>Ish Joylari Boshqaruvi</h2></div>
+          <button class="btn primary" onclick="openBolimModal()">+ Ish joyi qo'shish</button>
+        </div>
+        <div class="card"><div class="tbl-wrap"><table>
+          <thead><tr><th>#</th><th>Nomi</th><th>Smenalar</th><th>Ish o'rinlari</th><th>Xodimlar</th><th>Amallar</th></tr></thead>
+          <tbody id="bol-tbody"></tbody>
+        </table></div></div>
+      </div>
+
+      <!-- REYTING -->
+      <div class="page" id="page-reyting">
+        <div class="page-header">
+          <div><h2>Ish Yo'qotilishi Reytingi</h2><p>Xodimlar bo'yicha yo'qotish statistikasi</p></div>
+        </div>
+        <div id="reyting-content"></div>
+      </div>
+
+      <!-- SMENA XISOBOTI 08:36 -->
+      <div class="page" id="page-smena-xisobot">
+        <div class="page-header">
+          <div><h2>Smena Xisoboti</h2><p>Har kuni 08:36 da tayyor bo'ladigan hisobot</p></div>
+          <button class="btn sm" onclick="render0836Page()">🔄 Yangilash</button>
+        </div>
+        <div id="smena-xisobot-content"></div>
+      </div>
+
+      <!-- FOYDALANUVCHILAR -->
+      <div class="page" id="page-foydalanuvchilar">
+        <div class="page-header">
+          <div><h2>Foydalanuvchilar Boshqaruvi</h2></div>
+          <button class="btn primary" onclick="openUserModal()">+ Foydalanuvchi qo'shish</button>
+        </div>
+        <div class="card"><div class="tbl-wrap"><table>
+          <thead><tr><th>#</th><th>Login</th><th>Parol</th><th>Ism</th><th>Rol</th><th>Bo'lim</th><th>Smena</th><th>Amallar</th></tr></thead>
+          <tbody id="usr-tbody"></tbody>
+        </table></div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- MODAL: Xodim -->
+<div class="modal-overlay hidden" id="modal-xodim">
+  <div class="modal">
+    <h3 id="mx-title">Xodim qo'shish</h3>
+    <p class="m-sub">Xodim ma'lumotlarini kiriting</p>
+    <input type="hidden" id="mx-id">
+    <div class="form-row">
+      <div class="form-group"><label>Ism Familiya</label><input type="text" id="mx-ism" placeholder="ALIMOV BOBIR"></div>
+      <div class="form-group"><label>Tabel raqami</label><input type="text" id="mx-tabel" placeholder="A123"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Bo'lim</label><select id="mx-bolim" onchange="fillMxSmena()"></select></div>
+      <div class="form-group"><label>Smena</label><select id="mx-smena"></select></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn ghost" onclick="closeModal('modal-xodim')">Bekor</button>
+      <button class="btn primary" onclick="saveXodim()">Saqlash</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Bo'lim -->
+<div class="modal-overlay hidden" id="modal-bolim">
+  <div class="modal">
+    <h3 id="mb-title">Ish joyi qo'shish</h3>
+    <p class="m-sub">Ish joyi ma'lumotlarini kiriting</p>
+    <input type="hidden" id="mb-id">
+    <div class="form-row">
+      <div class="form-group"><label>Nomi</label><input type="text" id="mb-nom" placeholder="UA"></div>
+      <div class="form-group"><label>Ish o'rinlari</label><input type="number" id="mb-ish" min="1" value="10"></div>
+    </div>
+    <div class="form-group"><label>Smenalar (vergul bilan: A,B,D)</label><input type="text" id="mb-smenalar" placeholder="A,B,D"></div>
+    <div class="btn-row">
+      <button class="btn ghost" onclick="closeModal('modal-bolim')">Bekor</button>
+      <button class="btn primary" onclick="saveBolim()">Saqlash</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Foydalanuvchi -->
+<div class="modal-overlay hidden" id="modal-user">
+  <div class="modal">
+    <h3 id="mu-title">Foydalanuvchi qo'shish</h3>
+    <p class="m-sub">Login va parol ma'lumotlarini kiriting</p>
+    <input type="hidden" id="mu-id">
+    <div class="form-row">
+      <div class="form-group"><label>Ism</label><input type="text" id="mu-name" placeholder="UA-A Mas'ul"></div>
+      <div class="form-group"><label>Login</label><input type="text" id="mu-login" placeholder="ua_a"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Parol</label><input type="text" id="mu-pass" placeholder="1234"></div>
+      <div class="form-group"><label>Rol</label>
+        <select id="mu-role" onchange="toggleUserFields()">
+          <option value="mas_ul">Mas'ul xodim</option>
+          <option value="admin2">Hisobot Admin (2-daraja)</option>
+          <option value="admin">To'liq Admin</option>
+        </select>
+      </div>
+    </div>
+    <div id="mu-extra">
+      <div class="form-row">
+        <div class="form-group"><label>Bo'lim</label><select id="mu-bolim" onchange="fillMuSmena()"></select></div>
+        <div class="form-group"><label>Smena</label><select id="mu-smena"></select></div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn ghost" onclick="closeModal('modal-user')">Bekor</button>
+      <button class="btn primary" onclick="saveUser()">Saqlash</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/telegram.js"></script>
+<script src="js/i18n.js"></script>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+<script>
+// Firebase sozlamasi
+const firebaseConfig = {
+  apiKey: "AIzaSyCHR8vErcMrQpzMuoyJwsCpOKSbbf1k2yM",
+  authDomain: "davomat-tizimi-aed04.firebaseapp.com",
+  databaseURL: "https://davomat-tizimi-aed04-default-rtdb.firebaseio.com",
+  projectId: "davomat-tizimi-aed04",
+  storageBucket: "davomat-tizimi-aed04.firebasestorage.app",
+  messagingSenderId: "868541510155",
+  appId: "1:868541510155:web:40cdb3459593ef5da84d0e"
+};
+firebase.initializeApp(firebaseConfig);
+const firebaseDB = firebase.database();
+
+// Firebase orqali saqlash/o'qish
+const FirebaseStorage = {
+  async save(data) {
+    try {
+      await firebaseDB.ref('davomat').set(data);
+      return true;
+    } catch(e) { console.error('Firebase save:', e); return false; }
+  },
+  async load() {
+    try {
+      const snap = await firebaseDB.ref('davomat').get();
+      return snap.exists() ? snap.val() : null;
+    } catch(e) { console.error('Firebase load:', e); return null; }
+  },
+  listen(callback) {
+    firebaseDB.ref('davomat').on('value', snap => {
+      if(snap.exists()) callback(snap.val());
+    });
+  }
+};
+</script>
+
+<script src="js/data.js"></script>
+<script src="js/reyting.js"></script>
+<script src="js/reyting_ui.js"></script>
+<script src="js/app.js"></script>
+<script>
+// Logo yuklash (6-band)
+function uploadLogo(input) {
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const src = e.target.result;
+    localStorage.setItem('davomat_logo', src);
+    applyLogo(src);
+  };
+  reader.readAsDataURL(file);
+}
+function applyLogo(src) {
+  // Topbar logo
+  const box = document.getElementById('topbar-logo-box');
+  if(box) { box.innerHTML = `<img src="${src}" alt="Logo"><span class="upload-hint">📷<br>Rasm</span>`; }
+  // Login logo
+  const lb = document.getElementById('login-logo-box');
+  if(lb) lb.innerHTML = `<img src="${src}" alt="Logo">`;
+}
+// Load saved logo
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('davomat_logo');
+  if(saved) applyLogo(saved);
+});
+</script>
+</body>
+</html>
