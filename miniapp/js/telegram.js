@@ -1,4 +1,6 @@
-window.addEventListener('load', () => { alert('telegram.js ishladi! TG: ' + (window.Telegram ? 'bor' : 'yoq')); });
+window.addEventListener('load', () => { 
+  document.title = 'TG:' + (window.Telegram ? 'bor' : 'yoq') + ' | ' + (window.Telegram?.WebApp?.initData?.length || 0);
+});
 // ============================================================
 // TELEGRAM MINI APP INTEGRATSIYA
 // ============================================================
