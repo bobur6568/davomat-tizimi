@@ -78,13 +78,7 @@ function tryTelegramAutoLogin() {
     bootApp();
 
     // Xush kelibsiz xabari
-    if (isTelegramApp) {
-      TG.showPopup({
-        title: '✅ Xush kelibsiz!',
-        message: user.name + '\n' + getRoleLabel(user.role),
-        buttons: [{ type: 'ok' }]
-      });
-    }
+    tgHapticNotif('success');
     return true;
   }
 
