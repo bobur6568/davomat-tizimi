@@ -23,7 +23,7 @@ window.addEventListener('DOMContentLoaded', () => {
       if (!currentUser && typeof tryTelegramAutoLogin === 'function') {
         tryTelegramAutoLogin();
       }
-    }, 1200);
+    }, 3000);
   }
   startClock();
   document.getElementById('login-inp').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('pass-inp').focus(); });
