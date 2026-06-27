@@ -1,17 +1,31 @@
+window.addEventListener('load', () => { 
+  document.title = 'TG:' + (window.Telegram ? 'bor' : 'yoq') + ' | ' + (window.Telegram?.WebApp?.initData?.length || 0);
+});
 // ============================================================
 // TELEGRAM MINI APP INTEGRATSIYA
 // ============================================================
 
 const TG = window.Telegram?.WebApp;
-
-// Telegram WebApp mavjudligini tekshirish
 const isTelegramApp = !!(TG && TG.initData && TG.initData.length > 0);
+
+// initData dan user ID ni parse qilish
+function parseTgUserId() {
+  try {
+    if(!TG || !TG.initData) return null;
+    const params = new URLSearchParams(TG.initData);
+    const userStr = params.get('user');
+    if(!userStr) return null;
+    const user = JSON.parse(decodeURIComponent(userStr));
+    return user?.id ? String(user.id) : null;
+  } catch(e) { return null; }
+}
+const tgUserId = parseTgUserId() || (TG?.initDataUnsafe?.user?.id ? String(TG.initDataUnsafe.user.id) : null);
 
 // ============================================================
 // TELEGRAM INIT
 // ============================================================
 function initTelegramApp() {
-  if (!isTelegramApp) return;
+  alert('TG ID: ' + tgUserId + ' | initData: ' + (TG.initData ? TG.initData.substring(0,50) : 'YOQ'));
 
   // Ilovani to'liq kengaytirish
   TG.expand();
@@ -63,22 +77,42 @@ function handleTelegramBack() {
 // TELEGRAM USER => AUTO LOGIN
 // ============================================================
 function tryTelegramAutoLogin() {
-  if (!isTelegramApp) return false;
+  if (!tgUserId) return false;
+  if (currentUser) return true;
 
-  const tgUser = TG.initDataUnsafe?.user;
-  if (!tgUser) return false;
+  const tgId = tgUserId;
 
-  // Telegram user ID bo'yicha DB.users da qidirish
-  const tgId = String(tgUser.id);
-  const user = DB.users.find(u => u.telegram_id === tgId);
+  // Avval DB.users dan qidirish
+  if(DB && DB.users && DB.users.length > 0) {
+    const user = DB.users.find(u => u.telegram_id === tgId);
+    if (user) {
+      currentUser = user;
+      Storage.saveSession(user);
+      document.getElementById('login-screen').style.display='none';
+      bootApp();
+      tgHapticNotif('success');
+      return true;
+    }
+  }
 
-  if (user) {
-    currentUser = user;
-    Storage.saveSession(user);
-    bootApp();
+  // Firebase dan to'g'ridan yuklash
+  if(typeof FirebaseStorage !== 'undefined') {
+    FirebaseStorage.load().then(data => {
+      if(!data || !data.users) return;
+      const user = data.users.find(u => u.telegram_id === tgId);
+      if(user) {
+        Storage._applyData(data);
+        currentUser = user;
+        Storage.saveSession(user);
+        document.getElementById('login-screen').style.display='none';
+        bootApp();
+        tgHapticNotif('success');
+      }
+    });
+  }
 
-    // Xush kelibsiz xabari
-    tgHapticNotif('success');
+  return false;
+}
     return true;
   }
 
