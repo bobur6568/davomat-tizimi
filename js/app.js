@@ -172,6 +172,7 @@ function buildSidebar() {
     {page:'xodimlar',        icon:'👥', label:'Xodimlar',           roles:['admin']},
     {page:'bolimlar',        icon:'🏭', label:'Ish Joylari',        roles:['admin']},
     {page:'foydalanuvchilar',icon:'🔐', label:'Foydalanuvchilar',   roles:['admin']},
+    {page:'linestop',         icon:'🛑', label:'Line Stop',           roles:['admin','admin2','supervisor']},
   ];
   document.getElementById('sidebar').innerHTML=
     items.filter(i=>i.roles.includes(role)).map(i=>
@@ -196,6 +197,7 @@ function showPage(page) {
   if(page==='bolimlar') renderBolimlar();
   if(page==='foydalanuvchilar') { renderFoydalanuvchilar(); setTimeout(()=>renderTozalash(),100); }
   if(page==='davomat') initDavomat();
+  if(page==='linestop') renderLineStopPage();
 }
 
 // ============================================================
