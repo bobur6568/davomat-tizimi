@@ -113,6 +113,9 @@ function bootApp() {
   showPage(first);
   // Lang va test rejim
   setTimeout(()=>{ updateSidebarLang(); updateTestModeBadge(); }, 100);
+  // Admin tozalash tugmasi
+const resetBtn = document.getElementById('admin-reset-btn');
+if (resetBtn) resetBtn.style.display = currentUser.id === 'admin' ? 'inline-flex' : 'none';
 }
 
 
