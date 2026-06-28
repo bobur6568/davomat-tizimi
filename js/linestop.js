@@ -22,15 +22,22 @@ const LINE_STOP_VADMIN_BOLIMLAR = {
   'vadmin8': ['UA_B', 'PPS2_B'],
 };
 
-// Ko'ruvchi userlar
-const LINE_STOP_VIEWERS = ['admin', 'admin2', 'vadmin1', 'vadmin2', 'vadmin3'];
-const LINE_STOP_EDITORS = ['vadmin4', 'vadmin5', 'vadmin6', 'vadmin7', 'vadmin8'];
+// Tasdiqlash: vadmin2 → vadmin4,5,6 | vadmin3 → vadmin7,8
+const LINE_STOP_APPROVER_MAP = {
+  'vadmin2': ['vadmin4', 'vadmin5', 'vadmin6'],
+  'vadmin3': ['vadmin7', 'vadmin8'],
+};
 
+const LINE_STOP_VIEWERS  = ['admin', 'admin2', 'vadmin1', 'vadmin2', 'vadmin3'];
+const LINE_STOP_EDITORS  = ['vadmin4', 'vadmin5', 'vadmin6', 'vadmin7', 'vadmin8'];
+const LINE_STOP_APPROVERS = ['vadmin2', 'vadmin3'];
+
+// ============================================================
+// ROL TEKSHIRISH
+// ============================================================
 function isLineStopViewer() {
   if (!currentUser) return false;
-  return currentUser.role === 'admin' ||
-    (currentUser.role === 'admin2') ||
-    LINE_STOP_VIEWERS.includes(currentUser.id);
+  return LINE_STOP_VIEWERS.includes(currentUser.id) || currentUser.role === 'admin';
 }
 
 function isLineStopEditor() {
@@ -38,9 +45,25 @@ function isLineStopEditor() {
   return LINE_STOP_EDITORS.includes(currentUser.id);
 }
 
+function isLineStopApprover() {
+  if (!currentUser) return false;
+  return LINE_STOP_APPROVERS.includes(currentUser.id);
+}
+
+function isLineStopAdmin() {
+  if (!currentUser) return false;
+  return currentUser.id === 'admin' || currentUser.role === 'admin';
+}
+
 function getLineStopUserBolimlar() {
   if (!currentUser) return [];
   return LINE_STOP_VADMIN_BOLIMLAR[currentUser.id] || [];
+}
+
+// Joriy approver tasdiqlashi kerak bo'lgan editorlar
+function getMyEditors() {
+  if (!currentUser) return [];
+  return LINE_STOP_APPROVER_MAP[currentUser.id] || [];
 }
 
 // ============================================================
@@ -52,7 +75,8 @@ async function saveLineStop(data) {
   data.kiritgan = currentUser.id;
   data.kiritganNom = currentUser.name;
   data.kiritilganVaqt = new Date().toISOString();
-  await FirebaseStorage.save('line_stop/' + id, data);
+  data.status = 'pending'; // tasdiqlash kutilmoqda
+  await firebase.database().ref('davomat/line_stop/' + id).set(data);
   return id;
 }
 
@@ -63,6 +87,26 @@ async function getLineStoplar() {
       resolve(snap.exists() ? snap.val() : {});
     });
   });
+}
+
+async function approveLineStop(id) {
+  await firebase.database().ref('davomat/line_stop/' + id).update({
+    status: 'approved',
+    tasdiqlagan: currentUser.id,
+    tasdiqlaganNom: currentUser.name,
+    tasdiqlanganVaqt: new Date().toISOString(),
+  });
+}
+
+async function deleteLineStopRecord(id) {
+  if (!isLineStopAdmin()) {
+    showToast("O'chirish huquqingiz yo'q!", 'err');
+    return;
+  }
+  if (!confirm("Bu yozuvni o'chirmoqchimisiz?")) return;
+  await firebase.database().ref('davomat/line_stop/' + id).remove();
+  showToast("O'chirildi", 'ok');
+  renderLineStopPage();
 }
 
 // ============================================================
@@ -88,6 +132,8 @@ async function renderLineStopPage() {
 
   if (isLineStopEditor()) {
     renderLineStopEditorPage(content);
+  } else if (isLineStopApprover()) {
+    renderLineStopApproverPage(content);
   } else if (isLineStopViewer()) {
     renderLineStopViewerPage(content);
   } else {
@@ -96,17 +142,17 @@ async function renderLineStopPage() {
 }
 
 // ============================================================
-// KIRITUVCHI SAHIFASI
+// KIRITUVCHI SAHIFASI (vadmin4-8)
 // ============================================================
 async function renderLineStopEditorPage(content) {
-  const userBolimlar = getLineStopUserBolimlar();
   const lsData = await getLineStoplar();
 
-  // Foydalanuvchining yozuvlari
   const myRecords = Object.values(lsData)
     .filter(r => r && r.kiritgan === currentUser.id)
     .sort((a, b) => new Date(b.kiritilganVaqt) - new Date(a.kiritilganVaqt))
     .slice(0, 20);
+
+  const pendingCount = myRecords.filter(r => r.status === 'pending').length;
 
   let html = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:8px">
@@ -117,49 +163,126 @@ async function renderLineStopEditorPage(content) {
       <button class="btn primary" onclick="openLineStopModal()">+ Yangi to'xtalish</button>
     </div>
 
+    ${pendingCount > 0 ? `
+      <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:.75rem 1rem;margin-bottom:1rem;font-size:12px;color:var(--amber)">
+        ⏳ <b>${pendingCount} ta</b> yozuv tasdiqlanishini kutmoqda
+      </div>
+    ` : ''}
+
     <div class="card">
       <div class="card-title">Mening yozuvlarim</div>
-      ${myRecords.length === 0 ? '<div style="color:var(--text3);text-align:center;padding:1rem">Hozircha yozuv yo\'q</div>' : ''}
-      ${myRecords.map(r => renderLineStopCard(r, true)).join('')}
+      ${myRecords.length === 0
+        ? '<div style="color:var(--text3);text-align:center;padding:1rem">Hozircha yozuv yo\'q</div>'
+        : myRecords.map(r => renderLineStopCard(r, false)).join('')}
     </div>
   `;
 
   content.innerHTML = html;
 }
 
-function renderLineStopCard(r, canDelete = false) {
-  const d = new Date(r.kiritilganVaqt);
-  const dateStr = r.sana || '';
+// ============================================================
+// TASDIQLASH SAHIFASI (vadmin2, vadmin3)
+// ============================================================
+async function renderLineStopApproverPage(content) {
+  const lsData = await getLineStoplar();
+  const myEditors = getMyEditors();
+
+  const allMyRecords = Object.values(lsData)
+    .filter(r => r && myEditors.includes(r.kiritgan))
+    .sort((a, b) => new Date(b.kiritilganVaqt) - new Date(a.kiritilganVaqt));
+
+  const pending  = allMyRecords.filter(r => r.status === 'pending');
+  const approved = allMyRecords.filter(r => r.status === 'approved');
+
+  let html = `
+    <div style="margin-bottom:1.5rem">
+      <h3 style="font-size:15px;font-weight:600">Line Stop Tasdiqlash</h3>
+      <p style="font-size:11px;color:var(--text2)">${currentUser.name}</p>
+    </div>
+
+    ${pending.length > 0 ? `
+      <div class="card" style="margin-bottom:1rem">
+        <div class="card-title" style="color:var(--amber)">⏳ Tasdiqlanmagan (${pending.length})</div>
+        ${pending.map(r => renderLineStopCard(r, false, true)).join('')}
+      </div>
+    ` : `
+      <div style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:10px;padding:.75rem 1rem;margin-bottom:1rem;font-size:12px;color:#22c55e">
+        ✅ Barcha yozuvlar tasdiqlangan
+      </div>
+    `}
+
+    <div class="card">
+      <div class="card-title">Tasdiqlangan yozuvlar (${approved.length})</div>
+      ${approved.length === 0
+        ? '<div style="color:var(--text3);text-align:center;padding:1rem">Hozircha yozuv yo\'q</div>'
+        : approved.map(r => renderLineStopCard(r, false)).join('')}
+    </div>
+  `;
+
+  content.innerHTML = html;
+}
+
+// ============================================================
+// KARTA (yozuv ko'rinishi)
+// ============================================================
+function renderLineStopCard(r, canDelete = false, canApprove = false) {
+  const dateStr  = r.sana || '';
   const sababNom = LINE_STOP_SABABLAR.find(s => s.kod === r.sabab)?.nom || r.sabab || r.boshqaSabab || '?';
+  const isPending = r.status === 'pending';
+
+  const statusBadge = isPending
+    ? `<span style="background:rgba(245,158,11,.15);color:var(--amber);border:1px solid rgba(245,158,11,.3);padding:2px 8px;border-radius:20px;font-size:11px">⏳ Kutilmoqda</span>`
+    : `<span style="background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.3);padding:2px 8px;border-radius:20px;font-size:11px">✅ Tasdiqlangan</span>`;
 
   return `
-    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:.75rem">
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:.75rem;${isPending ? 'border-left:3px solid var(--amber)' : ''}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px">
         <div>
           <span style="font-weight:700;font-family:var(--mono)">${r.bolim}</span>
           <span style="margin:0 6px;color:var(--text3)">|</span>
           <span style="font-size:12px;color:var(--text2)">${dateStr} &nbsp; ${r.smena} smena</span>
         </div>
-        <div style="display:flex;gap:6px;align-items:center">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          ${statusBadge}
           <span style="background:rgba(240,79,79,.15);color:var(--red);border:1px solid rgba(240,79,79,.3);padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;font-family:var(--mono)">${r.davomiylik} daq</span>
-          ${canDelete ? `<button class="btn sm" style="color:var(--red);border-color:var(--red)" onclick="deleteLineStopRecord('${r.id}')">🗑</button>` : ''}
+          ${canDelete && isLineStopAdmin() ? `<button class="btn sm" style="color:var(--red);border-color:var(--red)" onclick="deleteLineStopRecord('${r.id}')">🗑</button>` : ''}
         </div>
       </div>
+
       <div style="margin-top:.5rem;font-size:12px;color:var(--text2)">
         ⏰ ${r.vaqtDan || ''} — ${r.vaqtGacha || ''}
+        ${r.kiritganNom ? `&nbsp;·&nbsp; 👤 ${r.kiritganNom}` : ''}
       </div>
       <div style="margin-top:.4rem;font-size:12px">
-        📋 ${sababNom}
-        ${r.boshqaSabab && r.sabab === 'LS6' ? ': ' + r.boshqaSabab : ''}
+        📋 ${sababNom}${r.boshqaSabab && r.sabab === 'LS6' ? ': ' + r.boshqaSabab : ''}
       </div>
       ${r.izoh ? `<div style="margin-top:.4rem;font-size:11px;color:var(--text2)">💬 ${r.izoh}</div>` : ''}
+      ${r.tasdiqlaganNom ? `<div style="margin-top:.4rem;font-size:11px;color:#22c55e">✅ Tasdiqlagan: ${r.tasdiqlaganNom}</div>` : ''}
       ${r.rasmlar && r.rasmlar.length > 0 ? `
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:.5rem">
-          ${r.rasmlar.map((img, i) => `<img src="${img}" onclick="openImageModal('${img}')" style="width:60px;height:60px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid var(--border)">`).join('')}
+          ${r.rasmlar.map(img => `<img src="${img}" onclick="openImageModal('${img}')" style="width:60px;height:60px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid var(--border)">`).join('')}
+        </div>
+      ` : ''}
+
+      ${canApprove && isPending ? `
+        <div style="margin-top:.75rem">
+          <button class="btn primary sm" onclick="confirmApproveLineStop('${r.id}')">✓ Tasdiqlash</button>
         </div>
       ` : ''}
     </div>
   `;
+}
+
+async function confirmApproveLineStop(id) {
+  if (!confirm("Bu yozuvni tasdiqlaysizmi?")) return;
+  try {
+    showToast('Tasdiqlanmoqda...', 'warn');
+    await approveLineStop(id);
+    showToast('✅ Tasdiqlandi!', 'ok');
+    renderLineStopPage();
+  } catch(e) {
+    showToast('Xatolik yuz berdi!', 'err');
+  }
 }
 
 // ============================================================
@@ -167,7 +290,7 @@ function renderLineStopCard(r, canDelete = false) {
 // ============================================================
 let lsSelectedImages = [];
 
-function openLineStopModal(editId = null) {
+function openLineStopModal() {
   lsSelectedImages = [];
   const userBolimlar = getLineStopUserBolimlar();
   const today = todayStr();
@@ -256,7 +379,7 @@ function closeLineStopModal() {
 }
 
 function calcLsDavomiylik() {
-  const dan = document.getElementById('ls-vaqt-dan')?.value;
+  const dan   = document.getElementById('ls-vaqt-dan')?.value;
   const gacha = document.getElementById('ls-vaqt-gacha')?.value;
   if (!dan || !gacha) return;
   const [dh, dm] = dan.split(':').map(Number);
@@ -268,7 +391,7 @@ function calcLsDavomiylik() {
 
 function toggleLsBoshqaSabab() {
   const sabab = document.getElementById('ls-sabab')?.value;
-  const wrap = document.getElementById('ls-boshqa-wrap');
+  const wrap  = document.getElementById('ls-boshqa-wrap');
   if (wrap) wrap.style.display = sabab === 'LS6' ? 'block' : 'none';
 }
 
@@ -299,25 +422,15 @@ function removeLsImage(idx) {
   renderLsImagePreview();
 }
 
-async function saveLineStop(data) {
-  const id = 'ls_' + Date.now();
-  data.id = id;
-  data.kiritgan = currentUser.id;
-  data.kiritganNom = currentUser.name;
-  data.kiritilganVaqt = new Date().toISOString();
-  await firebase.database().ref('davomat/line_stop/' + id).set(data);
-  return id;
-}
-
 async function saveLineStopRecord() {
-  const bolim = document.getElementById('ls-bolim')?.value;
-  const sana = document.getElementById('ls-sana')?.value;
-  const vaqtDan = document.getElementById('ls-vaqt-dan')?.value;
-  const vaqtGacha = document.getElementById('ls-vaqt-gacha')?.value;
-  const davomiylik = document.getElementById('ls-davomiylik')?.value;
-  const sabab = document.getElementById('ls-sabab')?.value;
+  const bolim       = document.getElementById('ls-bolim')?.value;
+  const sana        = document.getElementById('ls-sana')?.value;
+  const vaqtDan     = document.getElementById('ls-vaqt-dan')?.value;
+  const vaqtGacha   = document.getElementById('ls-vaqt-gacha')?.value;
+  const davomiylik  = document.getElementById('ls-davomiylik')?.value;
+  const sabab       = document.getElementById('ls-sabab')?.value;
   const boshqaSabab = document.getElementById('ls-boshqa-sabab')?.value?.trim();
-  const izoh = document.getElementById('ls-izoh')?.value?.trim();
+  const izoh        = document.getElementById('ls-izoh')?.value?.trim();
 
   if (!bolim || !sana || !vaqtDan || !vaqtGacha || !davomiylik) {
     showToast("Barcha maydonlarni to'ldiring!", 'err');
@@ -329,9 +442,9 @@ async function saveLineStopRecord() {
     return;
   }
 
-  const parts = bolim.split('_');
+  const parts   = bolim.split('_');
   const bolimId = parts[0];
-  const smena = parts[1];
+  const smena   = parts[1];
 
   const data = {
     bolim: bolimId,
@@ -351,19 +464,16 @@ async function saveLineStopRecord() {
     showToast('Saqlanmoqda...', 'warn');
     await saveLineStop(data);
     closeLineStopModal();
-    showToast('✓ Saqlandi!', 'ok');
+    showToast('✓ Saqlandi! Tasdiqlash kutilmoqda.', 'ok');
     renderLineStopPage();
   } catch(e) {
     showToast('Xatolik yuz berdi!', 'err');
   }
 }
 
-async function deleteLineStop(id) {
-  await firebase.database().ref('davomat/line_stop/' + id).remove();
-}
-
 // ============================================================
-// KO'RUVCHI SAHIFASI (admin, vadmin1-3)
+// KO'RUVCHI SAHIFASI (admin, vadmin1)
+// Faqat tasdiqlangan yozuvlar ko'rinadi
 // ============================================================
 let lsFilter = {
   muddat: 'kunlik',
@@ -375,37 +485,38 @@ let lsFilter = {
 
 async function renderLineStopViewerPage(content) {
   const lsData = await getLineStoplar();
-  const allRecords = Object.values(lsData).filter(r => r);
+
+  // vadmin1 va admin faqat tasdiqlangan yozuvlarni ko'radi
+  const allRecords = Object.values(lsData)
+    .filter(r => r && r.status === 'approved');
 
   const today = todayStr();
-  const now = new Date();
+  const now   = new Date();
 
-  // Muddat filtri
   let start, end;
   if (lsFilter.muddat === 'kunlik') { start = end = today; }
   else if (lsFilter.muddat === 'haftalik') {
-    const d = new Date(now);
+    const d   = new Date(now);
     const day = d.getDay();
     const diff = day === 0 ? -6 : 1 - day;
     d.setDate(d.getDate() + diff);
     start = d.toISOString().split('T')[0];
-    end = today;
+    end   = today;
   } else if (lsFilter.muddat === 'oylik') {
     start = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
-    end = today;
+    end   = today;
   } else if (lsFilter.muddat === 'choraklik') {
     const q = Math.floor(now.getMonth() / 3);
-    start = now.getFullYear() + '-' + String(q * 3 + 1).padStart(2, '0') + '-01';
-    end = today;
+    start   = now.getFullYear() + '-' + String(q * 3 + 1).padStart(2, '0') + '-01';
+    end     = today;
   } else if (lsFilter.muddat === 'yillik') {
     start = now.getFullYear() + '-01-01';
-    end = today;
+    end   = today;
   } else if (lsFilter.muddat === 'custom') {
     start = lsFilter.customStart || today;
-    end = lsFilter.customEnd || today;
+    end   = lsFilter.customEnd   || today;
   }
 
-  // Filter qo'llash
   let filtered = allRecords.filter(r => {
     if (r.sana < start || r.sana > end) return false;
     if (lsFilter.bolim && r.bolim !== lsFilter.bolim) return false;
@@ -413,12 +524,10 @@ async function renderLineStopViewerPage(content) {
     return true;
   }).sort((a, b) => b.sana.localeCompare(a.sana) || b.kiritilganVaqt.localeCompare(a.kiritilganVaqt));
 
-  // Statistika
-  const totalDaq = filtered.reduce((s, r) => s + (r.davomiylik || 0), 0);
+  const totalDaq  = filtered.reduce((s, r) => s + (r.davomiylik || 0), 0);
   const totalSoat = Math.floor(totalDaq / 60);
-  const totalMin = totalDaq % 60;
+  const totalMin  = totalDaq % 60;
 
-  // Bo'lim bo'yicha statistika
   const bolimStats = {};
   filtered.forEach(r => {
     const key = r.bolim + '_' + r.smena;
@@ -427,20 +536,18 @@ async function renderLineStopViewerPage(content) {
     bolimStats[key].daq += r.davomiylik || 0;
   });
 
-  const MN = ['','Yanvar','Fevral','Mart','Aprel','May','Iyun','Iyul','Avgust','Sentabr','Oktabr','Noyabr','Dekabr'];
-
   let html = `
     <div style="margin-bottom:1.5rem">
       <h3 style="font-size:15px;font-weight:600;margin-bottom:1rem">Line Stop Hisoboti</h3>
 
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
         <select onchange="lsFilter.muddat=this.value;renderLineStopPage()" style="max-width:140px">
-          <option value="kunlik"    ${lsFilter.muddat==='kunlik'?'selected':''}>Kunlik</option>
-          <option value="haftalik"  ${lsFilter.muddat==='haftalik'?'selected':''}>Haftalik</option>
-          <option value="oylik"     ${lsFilter.muddat==='oylik'?'selected':''}>Oylik</option>
+          <option value="kunlik"    ${lsFilter.muddat==='kunlik'   ?'selected':''}>Kunlik</option>
+          <option value="haftalik"  ${lsFilter.muddat==='haftalik' ?'selected':''}>Haftalik</option>
+          <option value="oylik"     ${lsFilter.muddat==='oylik'    ?'selected':''}>Oylik</option>
           <option value="choraklik" ${lsFilter.muddat==='choraklik'?'selected':''}>Choraklik</option>
-          <option value="yillik"    ${lsFilter.muddat==='yillik'?'selected':''}>Yillik</option>
-          <option value="custom"    ${lsFilter.muddat==='custom'?'selected':''}>O'z muddati</option>
+          <option value="yillik"    ${lsFilter.muddat==='yillik'   ?'selected':''}>Yillik</option>
+          <option value="custom"    ${lsFilter.muddat==='custom'   ?'selected':''}>O'z muddati</option>
         </select>
 
         ${lsFilter.muddat === 'custom' ? `
@@ -508,8 +615,9 @@ async function renderLineStopViewerPage(content) {
 
     <div class="card">
       <div class="card-title">Barcha yozuvlar (${filtered.length})</div>
-      ${filtered.length === 0 ? '<div style="text-align:center;padding:1.5rem;color:var(--text3)">Bu davrda to\'xtalish qayd etilmagan</div>' : ''}
-      ${filtered.map(r => renderLineStopCard(r, false)).join('')}
+      ${filtered.length === 0
+        ? '<div style="text-align:center;padding:1.5rem;color:var(--text3)">Bu davrda to\'xtalish qayd etilmagan</div>'
+        : filtered.map(r => renderLineStopCard(r, isLineStopAdmin())).join('')}
     </div>
   `;
 
