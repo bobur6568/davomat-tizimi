@@ -1672,7 +1672,9 @@ function renderGrafik(selectedOy) {
   const allOylar = Object.keys(DB.grafik_meta).sort().reverse();
 
   // Tanlangan oy (default: eng so'nggi)
-  const selOy = selectedOy || allOylar[0] || null;
+  const now2 = new Date();
+const defaultOy = now2.getFullYear()+'-'+String(now2.getMonth()+1).padStart(2,'0');
+const selOy = selectedOy || allOylar[0] || defaultOy;
 
   // Foydalanuvchi ko'rish rejimi (admin bo'lmasa faqat ko'radi)
   if(!isAdmin) {
