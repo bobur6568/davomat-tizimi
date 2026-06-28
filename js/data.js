@@ -424,6 +424,7 @@ const Storage = {
               if(data) {
                 this._applyData(data);
                 this._refreshActivePage();
+                if(!currentUser && typeof tryTelegramAutoLogin==='function') tryTelegramAutoLogin();
               }
             });
           }
