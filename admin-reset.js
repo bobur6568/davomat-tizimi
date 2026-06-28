@@ -87,10 +87,11 @@ async function confirmReset(tip) {
     showToast("O'chirilmoqda...", 'warn');
 
     if (tip === 'davomat_only' || tip === 'all') {
-      await firebase.database().ref('davomat/kunlar').remove();
-      await firebase.database().ref('davomat/davomat').remove();
-    }
-
+  await firebase.database().ref('davomat/kunlar').remove();
+  await firebase.database().ref('davomat/davomat').remove();
+  await firebase.database().ref('davomat/grafik').remove();
+  await firebase.database().ref('davomat/grafik_meta').remove();
+}
     if (tip === 'linestop_only' || tip === 'all') {
       await firebase.database().ref('davomat/line_stop').remove();
     }
