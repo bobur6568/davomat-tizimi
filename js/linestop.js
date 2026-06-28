@@ -309,6 +309,21 @@ async function saveLineStop(data) {
   return id;
 }
 
+async function saveLineStopRecord() {
+  const bolim = document.getElementById('ls-bolim')?.value;
+  const sana = document.getElementById('ls-sana')?.value;
+  const vaqtDan = document.getElementById('ls-vaqt-dan')?.value;
+  const vaqtGacha = document.getElementById('ls-vaqt-gacha')?.value;
+  const davomiylik = document.getElementById('ls-davomiylik')?.value;
+  const sabab = document.getElementById('ls-sabab')?.value;
+  const boshqaSabab = document.getElementById('ls-boshqa-sabab')?.value?.trim();
+  const izoh = document.getElementById('ls-izoh')?.value?.trim();
+
+  if (!bolim || !sana || !vaqtDan || !vaqtGacha || !davomiylik) {
+    showToast("Barcha maydonlarni to'ldiring!", 'err');
+    return;
+  }
+
   if (sabab === 'LS6' && !boshqaSabab) {
     showToast("Boshqa sabab matnini kiriting!", 'err');
     return;
