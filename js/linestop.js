@@ -57,7 +57,7 @@ async function saveLineStop(data) {
 }
 
 async function getLineStoplar() {
-  return await FirebaseStorage.load('line_stop') || {};
+  const data = await FirebaseStorage.load(); return (data && data.line_stop) ? data.line_stop : {};
 }
 
 async function deleteLineStop(id) {
