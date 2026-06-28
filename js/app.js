@@ -1685,9 +1685,7 @@ function renderGrafik(selectedOy) {
   const ny2 = now.getFullYear(), nm2 = now.getMonth()+1, nd2 = now.getDate();
 
   // Iyun 2026 uchun maxsus: 09.06.2026 kuni butun kun
-  if(ny2===2026 && nm2===6 && nd2===9) {
-    targets.push({year:2026, month:6, label:'Iyun 2026', special:true});
-  }
+  targets.push({year:ny2, month:nm2, label:MN[nm2]+' '+ny2});
   // Keyingi oy: har oyning oxirgi kunida
   const lastDay = new Date(ny2, nm2, 0).getDate();
   if(nd2===lastDay) {
