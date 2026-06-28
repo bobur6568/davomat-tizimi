@@ -57,11 +57,12 @@ async function saveLineStop(data) {
 }
 
 async function getLineStoplar() {
-  const data = await FirebaseStorage.load(); return (data && data.line_stop) ? data.line_stop : {};
-}
-
-async function deleteLineStop(id) {
-  await FirebaseStorage.save('line_stop/' + id, null);
+  return new Promise((resolve) => {
+    const dbRef = firebase.database().ref('davomat/line_stop');
+    dbRef.once('value', snap => {
+      resolve(snap.exists() ? snap.val() : {});
+    });
+  });
 }
 
 // ============================================================
@@ -298,20 +299,15 @@ function removeLsImage(idx) {
   renderLsImagePreview();
 }
 
-async function saveLineStopRecord() {
-  const bolim = document.getElementById('ls-bolim')?.value;
-  const sana = document.getElementById('ls-sana')?.value;
-  const vaqtDan = document.getElementById('ls-vaqt-dan')?.value;
-  const vaqtGacha = document.getElementById('ls-vaqt-gacha')?.value;
-  const davomiylik = document.getElementById('ls-davomiylik')?.value;
-  const sabab = document.getElementById('ls-sabab')?.value;
-  const boshqaSabab = document.getElementById('ls-boshqa-sabab')?.value;
-  const izoh = document.getElementById('ls-izoh')?.value;
-
-  if (!bolim || !sana || !davomiylik || !sabab) {
-    showToast("Bo'lim, sana, davomiylik va sabab to'ldirilishi shart!", 'err');
-    return;
-  }
+async function saveLineStop(data) {
+  const id = 'ls_' + Date.now();
+  data.id = id;
+  data.kiritgan = currentUser.id;
+  data.kiritganNom = currentUser.name;
+  data.kiritilganVaqt = new Date().toISOString();
+  await firebase.database().ref('davomat/line_stop/' + id).set(data);
+  return id;
+}
 
   if (sabab === 'LS6' && !boshqaSabab) {
     showToast("Boshqa sabab matnini kiriting!", 'err');
@@ -347,11 +343,8 @@ async function saveLineStopRecord() {
   }
 }
 
-async function deleteLineStopRecord(id) {
-  if (!confirm("O'chirishni tasdiqlaysizmi?")) return;
-  await deleteLineStop(id);
-  showToast("O'chirildi", 'ok');
-  renderLineStopPage();
+async function deleteLineStop(id) {
+  await firebase.database().ref('davomat/line_stop/' + id).remove();
 }
 
 // ============================================================
